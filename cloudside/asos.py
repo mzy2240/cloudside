@@ -9,7 +9,7 @@ import numpy
 import pandas
 from metar import Metar
 
-from . import validate
+import cloudside.validate as validate
 
 
 _fields = [
@@ -298,12 +298,13 @@ def _process_precip(data, rt, raw_precipcol):
     return precip
 
 
-def parse_file(filepath, new_precipcol="precipitation"):
+def parse_file(filepath, freq="h", new_precipcol="precipitation"):
     """Parses a raw ASOS/METAR file into a pandas.DataFrame
 
     Parameters
     ----------
     filepath : str or pathlib.Path object of the METAR file
+    freq: resample the data either every 5min or hourly (default is hourly)
     new_precipcol : str
         The desired column label of the precipitation column after it has been
         disaggregated from hourly accumulations
@@ -324,7 +325,8 @@ def parse_file(filepath, new_precipcol="precipitation"):
         df = pandas.DataFrame(list(map(_do_parse, rawf)))
 
     if not df.empty:
-        data = df.groupby("datetime").last().sort_index().resample(FIVEMIN).asfreq()
+        feq = HOURLY if freq == 'h' else FIVEMIN
+        data = df.groupby("datetime").last().sort_index().resample(feq).asfreq()
 
         rt = _find_reset_time(data["raw_precipitation"])
         precip = _process_precip(data, rt, "raw_precipitation")
@@ -335,7 +337,8 @@ def get_data(
     station_id,
     startdate,
     stopdate,
-    email,
+    freq="h",
+    email="me@mydomain.com",
     folder=".",
     raw_folder="01-raw",
     force_download=False,
@@ -351,6 +354,8 @@ def get_data(
         Pandas `Timestamp` or other datetime-like objects with `.year` and
         `.month` attributes representing the date range (inclusive) of data
         to be downloaded
+    freq: str
+        Resample the data either every 5min or hourly (default is hourly)
     email : str
         Your email address to be used as the ftp login password
     folder : str or pathlib.Path
@@ -389,5 +394,10 @@ def get_data(
         force_download=force_download,
     )
     raw_files = validate.progress_bar(pbar_fxn, _raw_files, desc="Parsing")
-    df = pandas.concat([parse_file(rf) for rf in raw_files])
+    df = pandas.concat([parse_file(rf, freq) for rf in raw_files])
     return df.pipe(validate.unique_index)
+
+
+if __name__ == "__main__":
+    data = get_data('KPDX', '2012-12-01', '2012-12-02', 'me@mydomain.com')
+    print(data)
