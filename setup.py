@@ -10,7 +10,7 @@ DESCRIPTION = "cloudside - download, assess, and visualize weather data"
 if __name__ == "__main__":
     setup(
         name="cloudside",
-        version="0.1.1",
+        version="0.2",
         author="Paul Hobson",
         author_email="pmhobson@gmail.com",
         url="http://python-metar.sourceforge.net/",

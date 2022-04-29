@@ -8,8 +8,9 @@ cloudside: download, assess, and visualize weather data
 
 What did you change?
 --------------------
-This forked repo has been modified to support resampling.
+This forked repo has been modified to support resampling and slicing.
 The default sampling rate is 1 hour instead of 5 minutes.
+Now the get_data method will output the data only within the range.
 
 The problem this is solving
 ---------------------------

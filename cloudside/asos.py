@@ -4,6 +4,7 @@ import warnings
 from ftplib import FTP, error_perm
 from pathlib import Path
 from collections import namedtuple
+from datetime import timedelta
 
 import numpy
 import pandas
@@ -395,9 +396,11 @@ def get_data(
     )
     raw_files = validate.progress_bar(pbar_fxn, _raw_files, desc="Parsing")
     df = pandas.concat([parse_file(rf, freq) for rf in raw_files])
+    mask = (df.index >= startdate) & (df.index < pandas.to_datetime(stopdate) + timedelta(days=1))
+    df = df.loc[mask]
     return df.pipe(validate.unique_index)
 
 
 if __name__ == "__main__":
-    data = get_data('KPDX', '2012-12-01', '2012-12-02', 'me@mydomain.com')
+    data = get_data('KPDX', '2012-12-01', '2012-12-02', 'h')
     print(data)
