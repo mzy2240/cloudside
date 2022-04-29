@@ -6,6 +6,10 @@ cloudside: download, assess, and visualize weather data
 .. image:: https://codecov.io/gh/Geosyntec/cloudside/branch/master/graph/badge.svg?token=02qkR2vPrK
     :target: https://codecov.io/gh/Geosyntec/cloudside
 
+What did you change?
+--------------------
+This forked repo has been modified to support resampling.
+The default sampling rate is 1 hour instead of 5 minutes.
 
 The problem this is solving
 ---------------------------
@@ -110,13 +114,13 @@ Followed by: ::
 Installation
 ------------
 
-* Activate your ``conda`` environment;
+* (Optional)Activate your ``conda`` environment;
 * Install via pip and git; and
 
 ::
 
-    conda activate cloudside
-    pip install git+https://github.com/Geosyntec/cloudside.git
+    conda activate cloudside // not necessary
+    pip install git+https://github.com/mzy2240/cloudside.git
 
 
 Testing
