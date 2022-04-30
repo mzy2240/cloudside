@@ -12,6 +12,8 @@ This forked repo has been modified to support resampling and slicing.
 The default sampling rate is 1 hour instead of 5 minutes.
 Now the get_data method will output the data only within the range.
 
+Add script to retrieve data directly from IEM server.
+
 The problem this is solving
 ---------------------------
 
