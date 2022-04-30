@@ -19,9 +19,9 @@ with pathlib.Path('requirements.txt').open() as requirements_txt:
 
 setup(
     name="cloudside",
-    version="0.2",
-    author="Paul Hobson",
-    author_email="pmhobson@gmail.com",
+    version="0.3",
+    author="Zeyu Mao",
+    author_email="zeyumao2@tamu.edu",
     url="http://python-metar.sourceforge.net/",
     description=DESCRIPTION,
     long_description=DESCRIPTION,

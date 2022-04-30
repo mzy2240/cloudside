@@ -5,9 +5,11 @@ from ftplib import FTP, error_perm
 from pathlib import Path
 from collections import namedtuple
 from datetime import timedelta
+from typing import Union
 
 import numpy
 import pandas
+import xarray
 from metar import Metar
 
 import cloudside.validate as validate
@@ -335,11 +337,11 @@ def parse_file(filepath, freq="h", new_precipcol="precipitation"):
 
 
 def get_data(
-    station_id,
-    startdate,
-    stopdate,
-    freq="h",
-    email="me@mydomain.com",
+    station_id: Union[str, list],
+    startdate: str,
+    stopdate: str,
+    freq: str="h",
+    email: str="me@mydomain.com",
     folder=".",
     raw_folder="01-raw",
     force_download=False,
@@ -372,7 +374,7 @@ def get_data(
 
     Returns
     -------
-    weather : pandas.DataFrame
+    weather : pandas.DataFrame or xarray.Dataset if station_id is a list
 
     Examples
     --------
@@ -402,5 +404,15 @@ def get_data(
 
 
 if __name__ == "__main__":
-    data = get_data('KPDX', '2012-12-01', '2012-12-02', 'h')
-    print(data)
+    # data = get_data('KPDX', '2012-12-01', '2012-12-02', 'h')
+    # print(data)
+    # data = get_data('KALI', '2021-12-01', '2021-12-02', 'h')
+    df = pandas.read_excel(r"C:\Users\test\Downloads\texas_stations.xlsx")
+    df = df[df['Type'] == 'ASOS']
+    df["Lat"] = " "
+    df["Lon"] = " "
+    meta = pandas.read_csv(r"C:\Users\test\Downloads\texas_meta.csv")
+    for station in df['ID']:
+        df.loc[df["ID"] == station, ["Lat", "Lon"]] = meta.loc[meta['stid'] == station[1:], ['lat', 'lon']].values
+    df.reset_index(drop=True, inplace=True)
+    df.to_csv("texas_asos_stations.csv")
