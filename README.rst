@@ -14,6 +14,8 @@ Now the get_data method will output the data only within the range.
 
 Add script to retrieve data directly from IEM server.
 
+Add support to retrieve NSRDB data as well.
+
 The problem this is solving
 ---------------------------
 
