@@ -10,14 +10,16 @@ from typing import Union
 from dateutil import parser
 from collections import OrderedDict
 import random
+from rex import NSRDBX
 # Python 2 and 3: alternative 4
-try:
-    from urllib.request import urlopen
-except ImportError:
-    from urllib2 import urlopen
+# try:
+#     from urllib.request import urlopen
+# except ImportError:
+#     from urllib2 import urlopen
+from urllib.request import urlopen
 
 # Number of attempts to download data
-MAX_ATTEMPTS = 6
+MAX_ATTEMPTS = 3
 # HTTPS here can be problematic for installs that don't have Lets Encrypt CA
 SERVICE = "http://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?"
 
@@ -35,7 +37,8 @@ def download_data(uri):
     attempt = 0
     while attempt < MAX_ATTEMPTS:
         try:
-            data = urlopen(uri, timeout=300).read().decode("utf-8")
+            obj = urlopen(uri, timeout=300)
+            data = obj.read().decode("utf-8")
             if data is not None and not data.startswith("ERROR"):
                 return data
         except Exception as exp:
@@ -132,7 +135,7 @@ def main():
         # out.close()
 
 
-def get_data_from_iem(station_id: Union[str, list, None], start_time: Union[str, datetime.datetime], end_time: Union[str, datetime.datetime], state:Union[str, list, None] = None, drop: Union[int, float] = 0):
+def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: str, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0):
     """
     Get data from Iowa Environmental Mesonet.
     Returns a pandas dataframe with meta info.
@@ -143,7 +146,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: Union[str,
         endts = parser.parse(end_time)
 
     # service = SERVICE + "data=all&tz=Etc/UTC&format=comma&latlon=yes&"
-    service = SERVICE + "data=tmpc&data=drct&data=sped&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
+    service = SERVICE + "data=tmpc&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
 
     service += startts.strftime("year1=%Y&month1=%m&day1=%d&")
     service += endts.strftime("year2=%Y&month2=%m&day2=%d&")
@@ -165,6 +168,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: Union[str,
     df_container = []
     valid_stations = []
     meta = OrderedDict()
+    print("-------------retrieving data from ASOS now--------------")
     for station in stations:
         if random.random() < drop:  # randomly drop some stations if there are too many
             continue
@@ -174,7 +178,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: Union[str,
             data = download_data(uri)
             df = pd.read_csv(StringIO(data), skiprows=5)
             if not df.empty:
-                df['valid'] = pd.to_datetime(df['valid'],format= '%Y-%m-%d %H:%M' ).round('h')
+                df['valid'] = pd.to_datetime(df['valid'],format= '%Y-%m-%d %H:%M' ).dt.floor('H')
                 df.rename(columns={'valid':'time'}, inplace=True)
                 df.set_index('time', inplace=True)
                 meta[station] = {'lat': df['lat'].iloc[0], 'lon': df['lon'].iloc[0]}
@@ -182,15 +186,41 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: Union[str,
                 df = df.groupby("time").last().sort_index().resample(pd.offsets.Hour(1)).asfreq()
                 df_container.append(df)
                 valid_stations.append(station)
+    
+    if nsrdb:
+        print("-------------retrieving data from NSRDB now--------------")
+        nsrdb_file = f"/nrel/nsrdb/v3/nsrdb_{startts.year}.h5"
+        if nsrdb_key:
+            option = {
+                'endpoint': 'https://developer.nrel.gov/api/hsds',
+                'api_key': nsrdb_key
+            }
+        else:
+            option = {
+                'endpoint': 'https://developer.nrel.gov/api/hsds',
+                'api_key': 'j6iRkRrxcw9qphjTEelcLziVQgF38S6pg4AhicnZ'
+            }
+
+        with NSRDBX(nsrdb_file, hsds=True, hsds_kwargs=option) as f:
+            gid_list = f.lat_lon_gid(list(zip([meta[station]['lat'] for station in valid_stations], [meta[station]['lon'] for station in valid_stations])))
+            time_idx = f.timestep_idx(start_time)
+            time_idx2 = f.timestep_idx(end_time)
+            # print(gid_list)
+            data = f['ghi', time_idx:time_idx2:2, gid_list]  # field, timestep, station
+        
+        for i, df in enumerate(df_container):
+            df['ghi'] = data[:, i]
             
     if len(df_container) == 1:
         return df_container[0], meta
     elif len(df_container) > 1:
-        print("yes")
         return pd.concat(df_container, keys=valid_stations, axis=1), meta
 
 
 if __name__ == "__main__":
-    # download_alldata()
-    data = get_data_from_iem(None, '2012-08-01', '2012-08-02', state=["TX", "NM"], drop=0)
+    stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
+    selected_stations = stations['ID'].tolist()
+    selected_stations = [station[1:] for station in selected_stations]
+    data = get_data_from_iem(selected_stations, '2020-08-01', '2020-08-02', state=None, drop=0)
     print(data[0])
+    # print(data[0])
