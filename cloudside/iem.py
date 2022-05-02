@@ -12,8 +12,9 @@ from collections import OrderedDict
 import random
 from rex import NSRDBX
 import numpy as np
-import pint 
-import pint_pandas
+# import pint 
+# import pint_pandas
+from tqdm import tqdm
 
 # Python 2 and 3: alternative 4
 # try:
@@ -156,7 +157,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
             endts = startts + datetime.timedelta(days=1)
 
     # service = SERVICE + "data=all&tz=Etc/UTC&format=comma&latlon=yes&"
-    service = SERVICE + "data=tmpc&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
+    service = SERVICE + "data=tmpc&data=dwpc&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
 
     service += startts.strftime("year1=%Y&month1=%m&day1=%d&hour1=%H&")
     service += endts.strftime("year2=%Y&month2=%m&day2=%d&hour2=%H&")
@@ -179,12 +180,14 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     valid_stations = []
     meta = OrderedDict()
     print("-------------retrieving data from ASOS now--------------")
-    for station in stations:
+    pbar =  tqdm(stations)
+    for station in pbar:
         if random.random() < drop:  # randomly drop some stations if there are too many
             continue
         else:
             uri = "%s&station=%s" % (service, station)
-            print("Downloading: %s" % (station,))
+            # print("Downloading: %s" % (station,))
+            pbar.set_description("Downloading: %s" % station)
             data = download_data(uri)
             df = pd.read_csv(StringIO(data), skiprows=5)
             if not df.empty:
@@ -195,9 +198,9 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                 df.drop(['station', 'lat', 'lon'], axis=1, inplace=True)
                 df = df.groupby("time").last().sort_index().resample(pd.offsets.Hour(1)).asfreq()
                 # df['sped'] = df['sped']/2.237  # convert from mph to m/s
-                df['tmpc'] = df['tmpc'].astype("pint[degC]")
-                df['sped'] = df['sped'].astype("pint[mile per hour]")
-                df['drct'] = df['drct'].astype("pint[degrees]")
+                # df['tmpc'] = df['tmpc'].astype("pint[degC]")
+                # df['sped'] = df['sped'].astype("pint[mile per hour]")
+                # df['drct'] = df['drct'].astype("pint[degrees]")
                 df_container.append(df)
                 valid_stations.append(station)
     
@@ -221,9 +224,9 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
             idx= np.searchsorted(f.time_index, timestamp)
             data = f['ghi', idx[0]:idx[1]:2, gid_list]  # field, timestep, station
         
-        for i, df in enumerate(df_container):
+        for i, df in enumerate(tqdm(df_container, desc="Processing SRD")):
             df['ghi'] = data[:, i]
-            df['ghi'] = df['ghi'].astype("pint[W/m^2]")
+            # df['ghi'] = df['ghi'].astype("pint[W/m^2]")
             
     if len(df_container) == 1:
         return df_container[0], meta
@@ -235,6 +238,6 @@ if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2020-08-01 12:00:00', end_time=None, state=None, drop=0, nsrdb=True)
-    print(data[0].dtypes)
+    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time=None, state=None, drop=0, nsrdb=False)
+    print(data[0])
     # print(data[0])

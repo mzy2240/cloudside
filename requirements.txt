@@ -5,7 +5,5 @@ matplotlib
 pandas
 xarray
 tqdm
-pint
-pint-pandas
 NREL-rex
 metar >= 1.5
