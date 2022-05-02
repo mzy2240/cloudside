@@ -11,6 +11,10 @@ from dateutil import parser
 from collections import OrderedDict
 import random
 from rex import NSRDBX
+import numpy as np
+import pint 
+import pint_pandas
+
 # Python 2 and 3: alternative 4
 # try:
 #     from urllib.request import urlopen
@@ -135,21 +139,27 @@ def main():
         # out.close()
 
 
-def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: str, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0):
+def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: Union[str, None] = None, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0):
     """
     Get data from Iowa Environmental Mesonet.
     Returns a pandas dataframe with meta info.
     """
     if isinstance(start_time, str):
-        startts = parser.parse(start_time)
+        startts = parser.parse(start_time).replace(tzinfo=datetime.timezone.utc)
     if isinstance(end_time, str):
-        endts = parser.parse(end_time)
+        endts = parser.parse(end_time).replace(tzinfo=datetime.timezone.utc)
+    if end_time is None or end_time == start_time:
+        try:
+            time.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            endts = startts + datetime.timedelta(hours=1)
+        except ValueError:
+            endts = startts + datetime.timedelta(days=1)
 
     # service = SERVICE + "data=all&tz=Etc/UTC&format=comma&latlon=yes&"
     service = SERVICE + "data=tmpc&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
 
-    service += startts.strftime("year1=%Y&month1=%m&day1=%d&")
-    service += endts.strftime("year2=%Y&month2=%m&day2=%d&")
+    service += startts.strftime("year1=%Y&month1=%m&day1=%d&hour1=%H&")
+    service += endts.strftime("year2=%Y&month2=%m&day2=%d&hour2=%H&")
 
     # Two examples of how to specify a list of stations
     stations = None
@@ -184,6 +194,10 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                 meta[station] = {'lat': df['lat'].iloc[0], 'lon': df['lon'].iloc[0]}
                 df.drop(['station', 'lat', 'lon'], axis=1, inplace=True)
                 df = df.groupby("time").last().sort_index().resample(pd.offsets.Hour(1)).asfreq()
+                # df['sped'] = df['sped']/2.237  # convert from mph to m/s
+                df['tmpc'] = df['tmpc'].astype("pint[degC]")
+                df['sped'] = df['sped'].astype("pint[mile per hour]")
+                df['drct'] = df['drct'].astype("pint[degrees]")
                 df_container.append(df)
                 valid_stations.append(station)
     
@@ -198,18 +212,18 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
         else:
             option = {
                 'endpoint': 'https://developer.nrel.gov/api/hsds',
-                'api_key': 'j6iRkRrxcw9qphjTEelcLziVQgF38S6pg4AhicnZ'
+                'api_key': 'fm5VsgYKIB3qYrmnuXyTlq05cwUvAIQnafTpSOHx'
             }
 
         with NSRDBX(nsrdb_file, hsds=True, hsds_kwargs=option) as f:
             gid_list = f.lat_lon_gid(list(zip([meta[station]['lat'] for station in valid_stations], [meta[station]['lon'] for station in valid_stations])))
-            time_idx = f.timestep_idx(start_time)
-            time_idx2 = f.timestep_idx(end_time)
-            # print(gid_list)
-            data = f['ghi', time_idx:time_idx2:2, gid_list]  # field, timestep, station
+            timestamp = [startts, endts]
+            idx= np.searchsorted(f.time_index, timestamp)
+            data = f['ghi', idx[0]:idx[1]:2, gid_list]  # field, timestep, station
         
         for i, df in enumerate(df_container):
             df['ghi'] = data[:, i]
+            df['ghi'] = df['ghi'].astype("pint[W/m^2]")
             
     if len(df_container) == 1:
         return df_container[0], meta
@@ -221,6 +235,6 @@ if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, '2020-08-01', '2020-08-02', state=None, drop=0)
-    print(data[0])
+    data = get_data_from_iem(selected_stations, start_time='2020-08-01 12:00:00', end_time=None, state=None, drop=0, nsrdb=True)
+    print(data[0].dtypes)
     # print(data[0])
