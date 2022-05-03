@@ -27,7 +27,7 @@ import zipfile
 from urllib.request import urlopen
 
 # Number of attempts to download data
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 5
 # HTTPS here can be problematic for installs that don't have Lets Encrypt CA
 SERVICE = "http://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?"
 
@@ -143,7 +143,7 @@ def main():
         # out.close()
 
 
-def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: Union[str, None] = None, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0):
+def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: Union[str, None] = None, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0, streamlit=False):
     """
     Get data from Iowa Environmental Mesonet.
     Returns a pandas dataframe with meta info.
@@ -185,7 +185,15 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     invalid = []
     print("-------------retrieving data from ASOS now--------------")
     pbar =  tqdm(stations)
+    if streamlit:
+        import streamlit as st
+        pbr = st.progress(0)
+        percent_complete  = 0
     for station in pbar:
+        if streamlit:
+            percent_complete += 1/len(stations)
+            st.session_state.dynamic_text = "Downloading: %s" % station
+            pbr.progress(percent_complete)
         if random.random() < drop:  # randomly drop some stations if there are too many
             continue
         else:
