@@ -27,7 +27,7 @@ import zipfile
 from urllib.request import urlopen
 
 # Number of attempts to download data
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = 10
 # HTTPS here can be problematic for installs that don't have Lets Encrypt CA
 SERVICE = "http://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?"
 
@@ -191,7 +191,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
         percent_complete  = 0
     for station in pbar:
         if streamlit:
-            percent_complete += 1/len(stations)
+            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 1
             st.session_state.dynamic_text = "Downloading: %s" % station
             pbr.progress(percent_complete)
         if random.random() < drop:  # randomly drop some stations if there are too many
