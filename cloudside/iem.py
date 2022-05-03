@@ -179,6 +179,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     df_container = []
     valid_stations = []
     meta = OrderedDict()
+    invalid = []
     print("-------------retrieving data from ASOS now--------------")
     pbar =  tqdm(stations)
     for station in pbar:
@@ -221,7 +222,6 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                 'api_key': 'x3tFeU4C8A5WlnxC90SldqY3nlxgsdYLYyuTHzf5'
             }
 
-        invalid = []
         with NSRDBX(nsrdb_file, hsds=True, hsds_kwargs=option) as f:
             lat_lon = np.array(list(zip([meta[station]['lat'] for station in valid_stations], [meta[station]['lon'] for station in valid_stations])))
             dist, gids = f.tree.query(lat_lon)
@@ -266,6 +266,6 @@ if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time=None, state="TX", drop=0, nsrdb=False)
+    data = get_data_from_iem(selected_stations, start_time='2021-01-01', end_time='2022-01-01', state="TX", drop=0, nsrdb=False)
     print(data[0])
     # print(data[0])
