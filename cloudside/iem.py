@@ -15,6 +15,9 @@ import numpy as np
 # import pint 
 # import pint_pandas
 from tqdm import tqdm
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+import zipfile
 
 # Python 2 and 3: alternative 4
 # try:
@@ -157,7 +160,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
             endts = startts + datetime.timedelta(days=1)
 
     # service = SERVICE + "data=all&tz=Etc/UTC&format=comma&latlon=yes&"
-    service = SERVICE + "data=tmpc&data=dwpc&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
+    service = SERVICE + "data=tmpf&data=dwpf&data=drct&data=sped&data=skyc1&tz=UTC&format=comma&latlon=yes&missing=null&trace=null&"
 
     service += startts.strftime("year1=%Y&month1=%m&day1=%d&hour1=%H&")
     service += endts.strftime("year2=%Y&month2=%m&day2=%d&hour2=%H&")
@@ -261,11 +264,50 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     elif len(df_container) > 1:
         return pd.concat(df_container, keys=valid_stations, axis=1), meta
 
+def save_excel(df, name, replace_nan):
+    df = df.add_prefix('K')  # add prefix to all the column names
+    df = df.droplevel(1, axis=1)  # remove the second level of the column names
+    df.index = df.index.rename("Date and Time (UTC, ISO8601 Format)")
+
+    df.index = df.index.to_series().apply(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z')
+
+    # now save the data to excel
+    df.to_excel(f"{name}.xlsx", float_format="%.1f", startrow=1, na_rep=str(replace_nan))
+    wb = load_workbook(f"{name}.xlsx")
+    ws = wb['Sheet1']
+    # ws.title = "Sheet1"
+    ft = Font(bold=True)
+    a1 = ws['A1']
+    a1.font = ft
+    ws['A1'] = "PWOPFTimePoint"
+    wb.save(f"{name}.xlsx")
+
+def save_data(df, replace_nan=-9999):
+    """
+    Save weather data to excel files in the format that PW supports.
+    """
+    temperature = df.loc[:, (slice(None), "tmpf")].copy()
+    save_excel(temperature, "temperature", replace_nan)
+    wind_speed = df.loc[:, (slice(None), "sped")].copy()
+    save_excel(wind_speed, "wind_speed", replace_nan)
+    wind_dirc = df.loc[:, (slice(None), "drct")].copy()
+    save_excel(wind_dirc, "wind_direction", replace_nan)
+    dew_point = df.loc[:, (slice(None), "dwpf")].copy()
+    save_excel(dew_point, "dew_point", replace_nan)
+    cloud_coverage = df.loc[:, (slice(None), "skyc1")].copy()
+    save_excel(cloud_coverage, "cloud_coverage", replace_nan)
+    with zipfile.ZipFile("weather_data.zip", mode="w") as archive:
+        archive.write("temperature.xlsx")
+        archive.write("wind_speed.xlsx")
+        archive.write("wind_direction.xlsx")
+        archive.write("dew_point.xlsx")
+        archive.write("cloud_coverage.xlsx")
+
 
 if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2021-01-01', end_time='2022-01-01', state="TX", drop=0, nsrdb=False)
-    print(data[0])
+    data = get_data_from_iem(selected_stations, start_time='2021-01-01', end_time='2021-01-02', state="TX", drop=0, nsrdb=False)
+    save_data(data[0])
     # print(data[0])
