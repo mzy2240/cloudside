@@ -194,7 +194,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                 df['valid'] = pd.to_datetime(df['valid'],format= '%Y-%m-%d %H:%M' ).dt.floor('H')
                 df.rename(columns={'valid':'time'}, inplace=True)
                 df.set_index('time', inplace=True)
-                if df.isnull().sum().sum() >= df.shape[0]:
+                if df.isnull().sum().sum() >= df.shape[0]:  # remove the station if it has too many missing values
                     continue
                 else:
                     meta[station] = {'lat': df['lat'].iloc[0], 'lon': df['lon'].iloc[0]}
@@ -221,6 +221,7 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                 'api_key': 'x3tFeU4C8A5WlnxC90SldqY3nlxgsdYLYyuTHzf5'
             }
 
+        invalid = []
         with NSRDBX(nsrdb_file, hsds=True, hsds_kwargs=option) as f:
             lat_lon = np.array(list(zip([meta[station]['lat'] for station in valid_stations], [meta[station]['lon'] for station in valid_stations])))
             dist, gids = f.tree.query(lat_lon)
@@ -236,15 +237,17 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
 
             timestamp = [startts, endts]
             idx= np.searchsorted(f.time_index, timestamp)
-            data = f['ghi', idx[0]:idx[1]:2, gids]  # field, timestep, station
-        
-        invalid = []
-        for i, df in enumerate(tqdm(df_container, desc="Processing SRD")):
             try:
-                df['ghi'] = data[:, i]
-            except ValueError:
-               invalid.append(i)
-            # df['ghi'] = df['ghi'].astype("pint[W/m^2]")
+                data = f['ghi', idx[0]:idx[1]:2, gids]  # field, timestep, station
+            
+                for i, df in enumerate(tqdm(df_container, desc="Processing SRD")):
+                    try:
+                        df['ghi'] = data[:, i]
+                    except ValueError:
+                        invalid.append(i)
+                        # df['ghi'] = df['ghi'].astype("pint[W/m^2]")
+            except OSError:
+                print("Too many requests for the current API key.")
 
     if invalid:
         # remove stations with invalid data
@@ -263,6 +266,6 @@ if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time=None, state="TX", drop=0, nsrdb=True)
+    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time=None, state="TX", drop=0, nsrdb=False)
     print(data[0])
     # print(data[0])
