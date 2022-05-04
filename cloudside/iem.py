@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import json
+from logging import warning
 import time
 import datetime
 import pandas as pd
@@ -12,6 +13,7 @@ from collections import OrderedDict
 import random
 from rex import NSRDBX
 import numpy as np
+import warnings
 # import pint 
 # import pint_pandas
 from tqdm import tqdm
@@ -141,7 +143,7 @@ def main():
         # out.close()
 
 
-def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: Union[str, None] = None, state:Union[str, list, None] = None, nsrdb: bool = True, nsrdb_key=None, drop: Union[int, float] = 0, streamlit=False):
+def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_time: Union[str, None] = None, state:Union[str, list, None] = None, nsrdb: bool = False, nsrdb_key="", drop: Union[int, float] = 0, streamlit=False):
     """
     Get data from Iowa Environmental Mesonet.
     Returns a pandas dataframe with meta info.
@@ -213,13 +215,13 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                     df_container.append(df)
                     valid_stations.append(station)
         if streamlit:
-            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 1
+            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 0.99
             st.session_state.dynamic_text = "Downloading: %s" % station
             pbr.progress(percent_complete)
     
     if streamlit:
         if percent_complete != 1:
-            pbr.progress(1)
+            pbr.progress(0.99)
 
     if nsrdb:
         print("-------------retrieving data from NSRDB now--------------")
@@ -288,7 +290,7 @@ def save_excel(df, name, replace_nan):
     worksheet.write('A1', "PWOPFTimePoint")
     writer.save()
 
-def save_data(df, replace_nan=-9999):
+def save_data(df, cloud_type="Categorical", replace_nan=-9999):
     """
     Save weather data to excel files in the format that PW supports.
     """
@@ -301,19 +303,40 @@ def save_data(df, replace_nan=-9999):
     dew_point = df.loc[:, (slice(None), "dwpf")].copy()
     save_excel(dew_point, "dew_point", replace_nan)
     cloud_coverage = df.loc[:, (slice(None), "skyc1")].copy()
+    if cloud_type == "Numerical":
+        cloud_coverage = cloud_coverage.replace(
+            {
+                "SKC": 0,
+                "CLR": 0,
+                "FEW": 1,
+                "SCT": 2,
+                "BKN": 3,
+                "OVC": 4,
+                "VV": -9999
+            }
+        )
     save_excel(cloud_coverage, "cloud_coverage", replace_nan)
+    try:
+        solar_radiation = df.loc[:, (slice(None), "ghi")].copy()
+        save_excel(solar_radiation, "solar_radiation", replace_nan)
+    except KeyError:
+        pass
     with zipfile.ZipFile("weather_data.zip", mode="w") as archive:
         archive.write("temperature.xlsx")
         archive.write("wind_speed.xlsx")
         archive.write("wind_direction.xlsx")
         archive.write("dew_point.xlsx")
         archive.write("cloud_coverage.xlsx")
+        try:
+            archive.write("solar_radiation.xlsx")
+        except NameError:
+            pass
 
 
 if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time='2020-07-01', state="TX", drop=0, nsrdb=False)
+    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time='2020-06-02', state="TX", drop=0, nsrdb=True)
     save_data(data[0])
     # print(data[0])
