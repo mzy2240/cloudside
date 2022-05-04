@@ -3,7 +3,7 @@ requests
 numpy
 matplotlib
 pandas
-xarray
 tqdm
+XlsxWriter
 NREL-rex
 metar >= 1.5

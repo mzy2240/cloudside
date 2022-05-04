@@ -15,8 +15,6 @@ import numpy as np
 # import pint 
 # import pint_pandas
 from tqdm import tqdm
-from openpyxl import load_workbook
-from openpyxl.styles import Font
 import zipfile
 
 # Python 2 and 3: alternative 4
@@ -190,10 +188,6 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
         pbr = st.progress(0)
         percent_complete  = 0
     for station in pbar:
-        if streamlit:
-            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 1
-            st.session_state.dynamic_text = "Downloading: %s" % station
-            pbr.progress(percent_complete)
         if random.random() < drop:  # randomly drop some stations if there are too many
             continue
         else:
@@ -218,7 +212,15 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                     # df['drct'] = df['drct'].astype("pint[degrees]")
                     df_container.append(df)
                     valid_stations.append(station)
+        if streamlit:
+            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 1
+            st.session_state.dynamic_text = "Downloading: %s" % station
+            pbr.progress(percent_complete)
     
+    if streamlit:
+        if percent_complete != 1:
+            pbr.progress(1)
+
     if nsrdb:
         print("-------------retrieving data from NSRDB now--------------")
         nsrdb_file = f"/nrel/nsrdb/v3/nsrdb_{startts.year}.h5"
@@ -280,15 +282,11 @@ def save_excel(df, name, replace_nan):
     df.index = df.index.to_series().apply(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z')
 
     # now save the data to excel
-    df.to_excel(f"{name}.xlsx", float_format="%.1f", startrow=1, na_rep=str(replace_nan))
-    wb = load_workbook(f"{name}.xlsx")
-    ws = wb['Sheet1']
-    # ws.title = "Sheet1"
-    ft = Font(bold=True)
-    a1 = ws['A1']
-    a1.font = ft
-    ws['A1'] = "PWOPFTimePoint"
-    wb.save(f"{name}.xlsx")
+    writer = pd.ExcelWriter(f"{name}.xlsx", engine='xlsxwriter')
+    df.to_excel(writer, float_format="%.1f", startrow=1, na_rep=str(replace_nan), sheet_name='Sheet1')
+    worksheet = writer.sheets['Sheet1']
+    worksheet.write('A1', "PWOPFTimePoint")
+    writer.save()
 
 def save_data(df, replace_nan=-9999):
     """
@@ -316,6 +314,6 @@ if __name__ == "__main__":
     stations = pd.read_csv(r"C:\Users\test\PycharmProjects\cloudside\texas_asos_stations.csv")
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
-    data = get_data_from_iem(selected_stations, start_time='2021-01-01', end_time='2021-01-02', state="TX", drop=0, nsrdb=False)
+    data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time='2020-07-01', state="TX", drop=0, nsrdb=False)
     save_data(data[0])
     # print(data[0])
