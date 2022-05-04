@@ -18,6 +18,7 @@ import warnings
 # import pint_pandas
 from tqdm import tqdm
 import zipfile
+import os
 
 # Python 2 and 3: alternative 4
 # try:
@@ -323,12 +324,18 @@ def save_data(df, cloud_type="Categorical", replace_nan=-9999):
         pass
     with zipfile.ZipFile("weather_data.zip", mode="w") as archive:
         archive.write("temperature.xlsx")
+        os.remove("temperature.xlsx")
         archive.write("wind_speed.xlsx")
+        os.remove("wind_speed.xlsx")
         archive.write("wind_direction.xlsx")
+        os.remove("wind_direction.xlsx")
         archive.write("dew_point.xlsx")
+        os.remove("dew_point.xlsx")
         archive.write("cloud_coverage.xlsx")
+        os.remove("cloud_coverage.xlsx")
         try:
             archive.write("solar_radiation.xlsx")
+            os.remove("solar_radiation.xlsx")
         except NameError:
             pass
 
