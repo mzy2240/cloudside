@@ -336,7 +336,7 @@ def save_data(df, cloud_type="Categorical", replace_nan=-9999):
         try:
             archive.write("solar_radiation.xlsx")
             os.remove("solar_radiation.xlsx")
-        except NameError:
+        except NameError or FileNotFoundError:
             pass
 
 
