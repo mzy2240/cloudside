@@ -188,9 +188,14 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     pbar =  tqdm(stations)
     if streamlit:
         import streamlit as st
+        status_text = st.empty()
         pbr = st.progress(0)
         percent_complete  = 0
     for station in pbar:
+        if streamlit:
+            status_text.text("Downloading: %s" % station)
+            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 0.9999
+            pbr.progress(percent_complete)
         if random.random() < drop:  # randomly drop some stations if there are too many
             continue
         else:
@@ -215,17 +220,15 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
                     # df['drct'] = df['drct'].astype("pint[degrees]")
                     df_container.append(df)
                     valid_stations.append(station)
-        if streamlit:
-            percent_complete = percent_complete + 1/len(stations) if percent_complete + 1/len(stations) <=1 else 0.99
-            st.session_state.dynamic_text = "Downloading: %s" % station
-            pbr.progress(percent_complete)
     
     if streamlit:
         if percent_complete != 1:
-            pbr.progress(0.99)
+            pbr.progress(0.9999)
+        status_text.text("Done!")
 
     if nsrdb:
         print("-------------retrieving data from NSRDB now--------------")
+        status_text.text("Downloading from NSRDB ...")
         nsrdb_file = f"/nrel/nsrdb/v3/nsrdb_{startts.year}.h5"
         if nsrdb_key:
             option = {
@@ -336,7 +339,9 @@ def save_data(df, cloud_type="Categorical", replace_nan=-9999):
         try:
             archive.write("solar_radiation.xlsx")
             os.remove("solar_radiation.xlsx")
-        except NameError or FileNotFoundError:
+        except NameError:
+            pass
+        except FileNotFoundError:
             pass
 
 
