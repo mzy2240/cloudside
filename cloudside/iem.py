@@ -228,7 +228,8 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
 
     if nsrdb:
         print("-------------retrieving data from NSRDB now--------------")
-        status_text.text("Downloading from NSRDB ...")
+        if streamlit:
+            status_text.text("Downloading from NSRDB ...")
         nsrdb_file = f"/nrel/nsrdb/v3/nsrdb_{startts.year}.h5"
         if nsrdb_key:
             option = {
@@ -238,19 +239,21 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
         else:
             option = {
                 'endpoint': 'https://developer.nrel.gov/api/hsds',
-                'api_key': 'x3tFeU4C8A5WlnxC90SldqY3nlxgsdYLYyuTHzf5'
+                'api_key': 'ib4rRdgnLqSx8W0L4FylazXw5zsKXuCWB71z7TkX'
             }
 
         with NSRDBX(nsrdb_file, hsds=True, hsds_kwargs=option) as f:
             lat_lon = np.array(list(zip([meta[station]['lat'] for station in valid_stations], [meta[station]['lon'] for station in valid_stations])))
             dist, gids = f.tree.query(lat_lon)
             dist_check = dist > f.distance_threshold
+ 
             if np.any(dist_check):
                 # remove stations outside of the NSRDB distance threshold
                 gids = np.delete(gids, dist_check)
                 valid_stations = [station for (station, remove) in zip(valid_stations, dist_check) if not remove]
                 df_container = [df for (df, remove) in zip(df_container, dist_check) if not remove]
-                for key, remove in zip(list(meta), dist_check):
+
+                for i, (key, remove) in enumerate(zip(list(meta), dist_check)):
                     if remove:
                         del meta[key]
 
@@ -271,9 +274,9 @@ def get_data_from_iem(station_id: Union[str, list, None], start_time: str, end_t
     if invalid:
         # remove stations with invalid data
         for i in invalid:
-            del df_container[i]
             del meta[valid_stations[i]]
-            del valid_stations[i]
+        df_container = [j for i, j in enumerate(df_container) if i not in invalid]
+        valid_stations = [j for i, j in enumerate(valid_stations) if i not in invalid]
 
     if len(df_container) == 1:
         return df_container[0], meta
@@ -350,5 +353,5 @@ if __name__ == "__main__":
     selected_stations = stations['ID'].tolist()
     selected_stations = [station[1:] for station in selected_stations]
     data = get_data_from_iem(selected_stations, start_time='2020-06-01', end_time='2020-06-02', state="TX", drop=0, nsrdb=True)
-    save_data(data[0])
+    # save_data(data[0])
     # print(data[0])
